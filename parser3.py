@@ -27,6 +27,9 @@ class MyHrefSniffer(HTMLParser):
 		if 'a' == tag:
 			if len(attrs) > 0:
 				href, hvalue = attrs[0]
+				xxhasht, xxhashvalue = 'none', False
+				if len(attrs) > 1:
+					xxhasht, xxhashvalue = attrs[1]
 				if 'href' == href:
 					pre = "fetch/"
 					if hvalue.startswith(pre):
@@ -34,7 +37,10 @@ class MyHrefSniffer(HTMLParser):
 						#print(uri)
 						# assert( href == 'href', "Must be true")
 						#hvalue[:
-						self._hrefs.append(uri)
+						entry = {'uri':uri}
+						if xxhasht == 'xxhash' and type(xxhashvalue) is str:
+							entry['xxhash'] = xxhashvalue
+						self._hrefs.append(entry)
 
 	def handle_endtag(self, tag):
 		self._a.pop()
@@ -81,7 +87,13 @@ class Downloader():
 	def formatSub(self, sub):
 		return "%s%s%s" % (self._startdir, os.sep, sub)
 	def goTask(self):
-		for uri in self._urls:
+		for entry in self._urls:
+			assert 'uri' in entry.keys()
+			uri = entry['uri']
+			if 'xxhash' in entry.keys():
+				assert type(entry['xxhash']) is str
+				print("%s has an xxhash value<%s>" % ( uri, entry['xxhash']))
+				#pass
 			self._taskCount += 1
 			url = FormatMyUrl(uri)
 			base, _ =  getDir(uri)
