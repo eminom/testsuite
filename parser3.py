@@ -4,17 +4,14 @@
 
 #import HTMLParser
 #in Python3
-from html.parser import HTMLParser
-import sys
 import os
-
-#import urllib2
-
+import sys
+from html.parser import HTMLParser
 from urllib.request import urlopen
 from urllib.error   import HTTPError
 import re
-
 from localconf import GetRootUri
+from PyXxhashMod import xxhash
 
 class MyHrefSniffer(HTMLParser):
 	def __init__(self):
@@ -75,13 +72,17 @@ class Downloader():
 			pass
 		#try except WindowsError
 
-	def __init__(self, hrefs, startdir):
+	def __init__(self, hrefs, startdir, seed):
 		self._urls = hrefs[:]
 		self._subspace = re.compile(' ')
 		self._taskCount = 0
 		self._passedCount = 0
+		self._verifiCount = 0
+		self._verifiFailed= 0
 		self._failedUrl = []
 		self._startdir = startdir
+		self._seed = seed
+		print("seed<%s>" % seed)
 		self.__makeSubDir(startdir)
 
 	def formatSub(self, sub):
@@ -92,7 +93,7 @@ class Downloader():
 			uri = entry['uri']
 			if 'xxhash' in entry.keys():
 				assert type(entry['xxhash']) is str
-				print("%s has an xxhash value<%s>" % ( uri, entry['xxhash']))
+				# print("%s has an xxhash value<%s>" % ( uri, entry['xxhash']))
 				#pass
 			self._taskCount += 1
 			url = FormatMyUrl(uri)
@@ -103,34 +104,41 @@ class Downloader():
 			else:
 				pass
 				#print("base is (%s)" % base)
-			print("retrieving <%s> ... " % (url),)
-			sys.stdout.flush()
+			print("get <%s> ... " % (url), end="")
+			# sys.stdout.flush()
 			try:
 				url = self._subspace.sub('%20', url) 
 					#if there is any space in url, urlopen won't return.
 				url_input = urlopen(url) 
 				turi = self.formatSub(uri)
+				chunk = url_input.read()
+				# verify
+				if 'xxhash' in entry.keys():
+					thatHash = entry['xxhash']
+					# print("seed %s" %self._seed)
+					thisHash = xxhash(chunk, self._seed)
+					if thatHash == thisHash:
+						print("<%s> OK" % (thisHash), end="")
+						self._verifiCount += 1
+					else:
+						print("verification failed for <%s> from <%s>" % (thisHash, thatHash), end="")
+						self._verifiFailed += 1
 				with open(turi, "wb") as fout:
-					fout.write(url_input.read())
+					fout.write(chunk)
 				#print("saved to %s" % (uri))
 				#sys.stdout.flush()   # Must be flush to stay in updated.
-				print('done')
 				self._passedCount += 1
+				print('.')
 			except HTTPError as e:
 				print('failed')
 				self._failedUrl.append(url)
 	def prtSummary(self):
-		print("Tasks performed done/total = (%d/%d)" % (self._passedCount, self._taskCount))
+		print("Tasks got/total/verified/v-failed = (%d/%d/<%d/%d>)" % (self._passedCount, self._taskCount, self._verifiCount, self._verifiFailed))
+		if self._passedCount == self._taskCount and self._taskCount == self._verifiCount and self._taskCount > 0:
+			print("all content verified")
 		for failed in self._failedUrl:
 			print(failed)
 
-
-#def GetRootUri():
-#	return "http://192.168.0.102:13000"
-	#return "http://127.0.0.1:13000"
-	#return "http://192.168.210.176:13000"
-	#return "http://127.0.0.1:13000"
-	#return "http://192.168.210.179:13000"
 
 def FormatMyUrl(name):
 	return "%s/fetch/%s" % ( GetRootUri(),  name )
@@ -154,11 +162,18 @@ def LoadFromFile():
 			content += f
 	return content
 
+def GetSeed():
+	#url = 
+	#seed = urlopen(url).read()
+	#print("Seed<%s>" %seed)
+	seed = int(urlopen(GetRootUri() + "/seed").read().decode('utf8').strip('\r\n\x00'), 16)
+	return seed
+
 if '__main__' == __name__:
 	s = MyHrefSniffer()
 	s.feed(LoadChunk()) 
 	#s.prt()
-	d = Downloader(s.getUrls(), os.getcwd() + os.sep + 'scratch')
+	d = Downloader(s.getUrls(), os.getcwd() + os.sep + 'scratch', GetSeed())
 	d.goTask()
 	d.prtSummary()
 

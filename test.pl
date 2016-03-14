@@ -7,6 +7,8 @@
 use 5.012;
 use warnings;
 use strict;
-
-my $line = "curl 192.168.0.107:13000/static | python3 ./parser.py";
+my $ip = "192.168.23.10";
+my $python = 'python3';
+$python = 'python' if $^O eq 'msys';
+my $line = "curl $ip:13000/static/hash | $python ./parser3.py";
 system($line);

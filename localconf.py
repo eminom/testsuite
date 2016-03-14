@@ -1,4 +1,4 @@
 
 
 def GetRootUri():
-	return "http://192.168.0.107:13000"
+	return "http://192.168.23.10:13000"
